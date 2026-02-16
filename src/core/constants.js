@@ -2,6 +2,9 @@
  * 常量定义
  */
 
+const fs = require('fs');
+const path = require('path');
+
 const SEARCH_KEYWORDS = [
   '搜索', '查找', '查询', '最新', '新闻', '天气', 
   '股价', '汇率', '今天', '明天', '本周', '本月', 
@@ -35,7 +38,18 @@ const MODEL_MAX_TOKENS = {
   'mistral-large': 32768
 };
 
-const VERSION = '1.0.0';
+// 从 package.json 读取版本号
+function getVersion() {
+  try {
+    const pkgPath = path.join(__dirname, '..', '..', 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    return pkg.version || '1.0.0';
+  } catch {
+    return '1.0.0';
+  }
+}
+
+const VERSION = getVersion();
 
 module.exports = {
   SEARCH_KEYWORDS,
