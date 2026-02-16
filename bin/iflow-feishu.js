@@ -155,14 +155,78 @@ async function checkPM2() {
 const CONFIG_DIR = path.join(process.env.HOME, '.feishu-config');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'feishu-app.json');
 
+// 验证飞书凭证
+async function verifyFeishuCredentials(appId, appSecret) {
+  const https = require('https');
+  
+  return new Promise((resolve) => {
+    log.info('正在验证飞书凭证...');
+    
+    const postData = JSON.stringify({
+      app_id: appId,
+      app_secret: appSecret
+    });
+    
+    const req = https.request({
+      hostname: 'open.feishu.cn',
+      port: 443,
+      path: '/open-apis/auth/v3/tenant_access_token/internal',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      },
+      timeout: 10000
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const result = JSON.parse(data);
+          if (result.tenant_access_token) {
+            resolve({ valid: true, token: result.tenant_access_token });
+          } else {
+            resolve({ 
+              valid: false, 
+              error: result.msg || '验证失败',
+              code: result.code
+            });
+          }
+        } catch (err) {
+          resolve({ valid: false, error: '响应解析失败' });
+        }
+      });
+    });
+    
+    req.on('error', (err) => {
+      resolve({ valid: false, error: `网络错误: ${err.message}` });
+    });
+    
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ valid: false, error: '验证超时' });
+    });
+    
+    req.write(postData);
+    req.end();
+  });
+}
+
 // 检测飞书配置
 async function checkFeishuConfig() {
   log.step('检查飞书配置...');
   
   // 检查环境变量
   if (process.env.FEISHU_APP_ID && process.env.FEISHU_APP_SECRET) {
-    log.success('检测到环境变量配置');
-    return true;
+    // 验证环境变量
+    const verify = await verifyFeishuCredentials(process.env.FEISHU_APP_ID, process.env.FEISHU_APP_SECRET);
+    if (verify.valid) {
+      log.success('环境变量配置有效');
+      return true;
+    } else {
+      log.error(`环境变量配置无效: ${verify.error}`);
+      return false;
+    }
   }
   
   // 检查配置文件
@@ -170,53 +234,92 @@ async function checkFeishuConfig() {
     try {
       const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
       if (config.appId && config.appSecret) {
-        log.success('飞书配置已存在');
-        return true;
+        // 验证已有配置
+        const verify = await verifyFeishuCredentials(config.appId, config.appSecret);
+        if (verify.valid) {
+          log.success('飞书配置有效');
+          return true;
+        } else {
+          log.warn(`现有配置无效: ${verify.error}`);
+          log.info('请重新配置');
+        }
       }
     } catch (err) {
       log.warn(`配置文件格式错误: ${err.message}`);
     }
   }
   
-  log.warn('未找到飞书配置');
-  console.log('');
-  console.log('请输入飞书机器人凭证（从飞书开放平台获取）:');
-  console.log('文档: https://open.feishu.cn/document/home/introduction-to-feishu-open-platform');
-  console.log('');
+  // 交互式配置
+  let configured = false;
+  let attempts = 0;
+  const maxAttempts = 3;
   
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-  
-  const ask = (prompt) => new Promise((resolve) => {
-    rl.question(prompt, resolve);
-  });
-  
-  const appId = await ask('📱 App ID: ');
-  if (!appId || appId.trim() === '') {
-    log.error('App ID 不能为空');
+  while (!configured && attempts < maxAttempts) {
+    if (attempts > 0) {
+      console.log('');
+      log.warn(`第 ${attempts + 1} 次尝试 (最多 ${maxAttempts} 次)`);
+    } else {
+      console.log('');
+      console.log('请输入飞书机器人凭证（从飞书开放平台获取）:');
+      console.log('文档: https://open.feishu.cn/document/home/introduction-to-feishu-open-platform');
+      console.log('');
+    }
+    
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+    
+    const ask = (prompt) => new Promise((resolve) => {
+      rl.question(prompt, resolve);
+    });
+    
+    const appId = await ask('📱 App ID: ');
+    if (!appId || appId.trim() === '') {
+      log.error('App ID 不能为空');
+      rl.close();
+      attempts++;
+      continue;
+    }
+    
+    const appSecret = await ask('🔐 App Secret: ');
+    if (!appSecret || appSecret.trim() === '') {
+      log.error('App Secret 不能为空');
+      rl.close();
+      attempts++;
+      continue;
+    }
+    
     rl.close();
+    
+    // 验证凭证
+    const verify = await verifyFeishuCredentials(appId.trim(), appSecret.trim());
+    
+    if (verify.valid) {
+      // 保存配置
+      if (!fs.existsSync(CONFIG_DIR)) {
+        fs.mkdirSync(CONFIG_DIR, { recursive: true });
+      }
+      
+      const config = { appId: appId.trim(), appSecret: appSecret.trim() };
+      fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+      log.success(`配置已保存到: ${CONFIG_PATH}`);
+      configured = true;
+    } else {
+      log.error(`凭证验证失败: ${verify.error}`);
+      if (verify.code === 10003 || verify.code === 10014) {
+        console.log('提示: 请检查 App ID 和 App Secret 是否正确');
+      } else if (verify.code === 10015) {
+        console.log('提示: 应用已被禁用，请在飞书开放平台检查应用状态');
+      }
+      attempts++;
+    }
+  }
+  
+  if (!configured) {
+    log.error('配置失败次数过多，请检查凭证后重试');
     return false;
   }
-  
-  const appSecret = await ask('🔐 App Secret: ');
-  if (!appSecret || appSecret.trim() === '') {
-    log.error('App Secret 不能为空');
-    rl.close();
-    return false;
-  }
-  
-  rl.close();
-  
-  // 保存配置
-  if (!fs.existsSync(CONFIG_DIR)) {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true });
-  }
-  
-  const config = { appId: appId.trim(), appSecret: appSecret.trim() };
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
-  log.success(`配置已保存到: ${CONFIG_PATH}`);
   
   return true;
 }
