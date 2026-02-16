@@ -5,28 +5,28 @@
 /**
  * 格式化时间显示
  * @param {number} ms - 毫秒数
- * @returns {string} 格式化的时间字符串
+ * @returns {string} 格式化的时间字符串 (h m s 格式)
  */
 function formatTime(ms) {
   if (ms < 1000) {
     return `${ms}ms`;
   }
   
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
+  const totalSeconds = Math.floor(ms / 1000);
+  const seconds = totalSeconds % 60;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const minutes = totalMinutes % 60;
+  const hours = Math.floor(totalMinutes / 60);
   
   if (hours > 0) {
-    const remainMinutes = minutes % 60;
-    return remainMinutes > 0 ? `${hours}h ${remainMinutes}m` : `${hours}h`;
+    return `${hours}h ${minutes}m ${seconds}s`;
   }
   
   if (minutes > 0) {
-    const remainSeconds = seconds % 60;
-    return remainSeconds > 0 ? `${minutes}m ${remainSeconds}s` : `${minutes}m`;
+    return `${minutes}m ${seconds}s`;
   }
   
-  return `${(ms / 1000).toFixed(1)}s`;
+  return `${seconds}s`;
 }
 
 class CardBuilder {
