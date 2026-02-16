@@ -9,40 +9,55 @@
 - **会话管理** - 自动保存上下文历史
 - **模式切换** - 支持 default/yolo/plan/smart 模式
 - **自动搜索** - 检测搜索关键词自动启用网络搜索
+- **交互式配置** - 首次运行自动引导配置
+
+## 安装
+
+```bash
+npm install -g iflow-feishu
+```
 
 ## 快速开始
 
-### 一键启动
+### 方式一：交互式配置（推荐）
+
+直接运行，首次使用会引导你配置飞书凭证：
 
 ```bash
 iflow-feishu
 ```
 
-启动脚本会自动完成以下操作：
+按提示输入飞书机器人的 App ID 和 App Secret 即可。
 
-1. **检查 iFlow CLI** - 未安装时询问是否安装
-2. **安装插件依赖** - 自动安装 npm 依赖
-3. **安装 PM2** - 自动安装进程管理器
-4. **配置飞书凭证** - 首次使用时引导输入
-5. **启动服务**
+### 方式二：环境变量
 
-### 前置要求
+```bash
+export FEISHU_APP_ID="cli_xxxxxxxxxxxx"
+export FEISHU_APP_SECRET="xxxxxxxxxxxxxxxx"
+iflow-feishu
+```
 
-- Node.js >= 16.0.0
-
-### 手动配置
-
-如需手动配置飞书凭证：
+### 方式三：配置文件
 
 ```bash
 mkdir -p ~/.feishu-config
-echo '{
-  "appId": "your-app-id",
-  "appSecret": "your-app-secret"
-}' > ~/.feishu-config/feishu-app.json
+cat > ~/.feishu-config/feishu-app.json << 'EOF'
+{
+  "appId": "cli_xxxxxxxxxxxx",
+  "appSecret": "xxxxxxxxxxxxxxxx"
+}
+EOF
+iflow-feishu
 ```
 
+## 前置要求
+
+- Node.js >= 16.0.0
+- iFlow CLI（可选，用于本地开发）
+
 ## 命令列表
+
+在飞书中给机器人发送以下命令：
 
 | 命令 | 说明 |
 |------|------|
@@ -51,6 +66,44 @@ echo '{
 | `/mode` | 查看当前模式 |
 | `/mode <模式>` | 切换模式 (default/yolo/plan/smart) |
 | `/status` | 查看会话状态 |
+
+## 环境变量
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `FEISHU_APP_ID` | 飞书应用 ID | - |
+| `FEISHU_APP_SECRET` | 飞书应用密钥 | - |
+| `PORT` | HTTP 服务端口 | 18080 |
+| `LOG_LEVEL` | 日志级别 (DEBUG/INFO/WARN/ERROR) | INFO |
+
+## 常用操作
+
+```bash
+# 健康检查
+curl http://localhost:18080/health
+
+# 后台运行
+nohup iflow-feishu > iflow-feishu.log 2>&1 &
+
+# 查看日志
+tail -f iflow-feishu.log
+
+# 使用 PM2 管理
+pm2 start iflow-feishu
+pm2 logs iflow-feishu
+pm2 restart iflow-feishu
+pm2 stop iflow-feishu
+```
+
+## 飞书机器人配置
+
+1. 访问 [飞书开放平台](https://open.feishu.cn/)
+2. 创建企业自建应用
+3. 开通机器人能力
+4. 配置事件订阅：
+   - URL: `http://your-server:18080/webhook`
+   - 事件：接收消息
+5. 获取 App ID 和 App Secret
 
 ## 项目结构
 
@@ -79,67 +132,6 @@ iflow-feishu/
 │   └── config.example.json   # 配置示例
 ├── package.json
 └── README.md
-```
-
-## 架构说明
-
-### 模块职责
-
-| 模块 | 职责 |
-|------|------|
-| service.js | 协调各模块，管理服务生命周期 |
-| message-processor.js | 消息解析、上下文构建 |
-| stream-handler.js | 流式响应处理、token 提取 |
-| http-server.js | HTTP 服务，健康检查，事件回调 |
-| websocket-client.js | 飞书 WebSocket 连接 |
-| feishu-client.js | 飞书 API 封装 |
-| iflow-client.js | iFlow CLI 调用封装 |
-| session.js | 会话持久化存储 |
-| card-builder.js | 飞书卡片构建 |
-| commands.js | 命令处理逻辑 |
-
-### 数据流
-
-```
-飞书消息 -> WebSocket -> service.handleMessageEvent()
-    -> messageProcessor.parseMessage()
-    -> commandHandler.handle() 或 processMessage()
-    -> iflowClient.execute() (流式)
-    -> streamHandler.extractResponse()
-    -> feishuClient.updateCardMessage()
-```
-
-## 配置选项
-
-| 选项 | 说明 | 默认值 |
-|------|------|--------|
-| `feishu.appId` | 飞书应用 ID | - |
-| `feishu.appSecret` | 飞书应用密钥 | - |
-| `server.port` | HTTP 服务端口 | 18080 |
-| `sessions.maxHistory` | 最大历史消息数 | 15 |
-| `iflow.timeout` | CLI 超时时间(ms) | 300000 |
-
-## 环境变量
-
-| 变量 | 说明 |
-|------|------|
-| `PORT` | 服务端口 |
-| `LOG_LEVEL` | 日志级别 (DEBUG/INFO/WARN/ERROR) |
-
-## 常用操作
-
-```bash
-# 查看服务状态
-pm2 status iflow-feishu
-
-# 查看日志
-pm2 logs iflow-feishu
-
-# 重启服务
-pm2 restart iflow-feishu
-
-# 健康检查
-curl http://localhost:18080/health
 ```
 
 ## 许可证

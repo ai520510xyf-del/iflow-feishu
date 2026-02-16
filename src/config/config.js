@@ -1,7 +1,7 @@
 /**
  * 配置管理模块
  * 
- * 负责加载和验证配置
+ * 负责加载和验证配置，支持交互式配置向导
  */
 
 const fs = require('fs');
@@ -11,6 +11,19 @@ const { DEFAULT_MODEL, DEFAULT_MAX_TOKENS, MODEL_MAX_TOKENS } = require('../core
 
 const CONFIG_DIR = path.join(process.env.HOME, '.feishu-config');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'feishu-app.json');
+
+// 获取版本号
+function getVersion() {
+  try {
+    const pkgPath = path.join(__dirname, '..', '..', 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    return pkg.version || '1.0.0';
+  } catch {
+    return '1.0.0';
+  }
+}
+
+const VERSION = getVersion();
 
 /**
  * 加载飞书配置
@@ -109,79 +122,80 @@ function validateConfig(config) {
 }
 
 /**
- * 获取或创建配置（同步版本用于启动时）
+ * 构建完整配置对象
  */
-function getOrCreateConfig() {
+function buildConfig(feishuConfig) {
+  return {
+    version: VERSION,
+    feishu: {
+      appId: feishuConfig.appId,
+      appSecret: feishuConfig.appSecret,
+    },
+    iflow: {
+      command: 'iflow',
+      timeout: 300000,
+      workDir: process.env.HOME || '/data/data/com.termux/files/home',
+      maxTokens: DEFAULT_MAX_TOKENS,
+      modelMaxTokens: MODEL_MAX_TOKENS
+    },
+    server: { 
+      port: parseInt(process.env.PORT, 10) || 18080,
+      host: '0.0.0.0'
+    },
+    sessions: {
+      dir: path.join(process.env.HOME || '/tmp', '.iflow-feishu', 'sessions'),
+      maxHistory: 15,
+    },
+    card: {
+      titleFontSize: 'small',
+      colors: {
+        model: 'blue',
+        generating: 'orange',
+        completed: 'green'
+      }
+    }
+  };
+}
+
+/**
+ * 初始化配置（异步，支持交互式向导）
+ * @returns {Promise<Object>} 配置对象
+ */
+async function initConfig() {
   let feishuConfig = loadFeishuConfig();
   
+  // 检查环境变量
+  if (!feishuConfig && process.env.FEISHU_APP_ID && process.env.FEISHU_APP_SECRET) {
+    feishuConfig = {
+      appId: process.env.FEISHU_APP_ID,
+      appSecret: process.env.FEISHU_APP_SECRET
+    };
+  }
+  
+  // 配置缺失，启动向导
   if (!feishuConfig) {
     console.log('\n⚠️  未找到飞书配置文件');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    console.log('请创建配置文件: ~/.feishu-config/feishu-app.json');
-    console.log('内容格式:\n');
-    console.log('  {');
-    console.log('    "appId": "cli_xxxxxxxxxxxx",');
-    console.log('    "appSecret": "xxxxxxxxxxxxxxxx"');
-    console.log('  }\n');
-    console.log('或设置环境变量:');
-    console.log('  FEISHU_APP_ID=cli_xxxxxxxxxxxx');
-    console.log('  FEISHU_APP_SECRET=xxxxxxxxxxxxxxxx\n');
     
-    // 检查环境变量
-    if (process.env.FEISHU_APP_ID && process.env.FEISHU_APP_SECRET) {
-      console.log('✅ 检测到环境变量配置\n');
-      return {
-        appId: process.env.FEISHU_APP_ID,
-        appSecret: process.env.FEISHU_APP_SECRET
-      };
-    }
-    
-    process.exit(1);
+    feishuConfig = await setupWizard();
   }
   
-  return feishuConfig;
-}
-
-// 加载飞书配置
-const feishuConfig = getOrCreateConfig();
-
-// 构建完整配置
-const config = {
-  feishu: {
-    appId: feishuConfig.appId,
-    appSecret: feishuConfig.appSecret,
-  },
-  iflow: {
-    command: 'iflow',
-    timeout: 300000,
-    workDir: process.env.HOME || '/data/data/com.termux/files/home',
-    maxTokens: DEFAULT_MAX_TOKENS,
-    modelMaxTokens: MODEL_MAX_TOKENS
-  },
-  server: { 
-    port: parseInt(process.env.PORT, 10) || 18080,
-    host: '0.0.0.0'
-  },
-  sessions: {
-    dir: path.join(process.env.HOME || '/tmp', '.iflow-feishu', 'sessions'),
-    maxHistory: 15,
-  },
-  card: {
-    titleFontSize: 'small',
-    colors: {
-      model: 'blue',
-      generating: 'orange',
-      completed: 'green'
-    }
+  const config = buildConfig(feishuConfig);
+  
+  // 验证配置
+  validateConfig(config);
+  
+  // 确保会话目录存在
+  if (!fs.existsSync(config.sessions.dir)) {
+    fs.mkdirSync(config.sessions.dir, { recursive: true });
   }
-};
-
-// 验证配置
-validateConfig(config);
-
-// 确保会话目录存在
-if (!fs.existsSync(config.sessions.dir)) {
-  fs.mkdirSync(config.sessions.dir, { recursive: true });
+  
+  return config;
 }
 
-module.exports = config;
+module.exports = {
+  initConfig,
+  getVersion,
+  VERSION,
+  CONFIG_PATH
+};

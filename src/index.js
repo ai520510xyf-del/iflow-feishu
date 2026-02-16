@@ -1,14 +1,17 @@
 /**
- * iFlow Feishu - v1.0.0
+ * iFlow Feishu
  * 将 iFlow CLI 接入飞书机器人
  */
 
 const { FeishuService } = require('./core/service');
-const config = require('./config/config');
+const { initConfig, VERSION } = require('./config/config');
 const { logger } = require('./utils/logger');
 
 async function main() {
-  console.log('\n🚀 iFlow Feishu v1.0.0');
+  // 初始化配置（支持交互式向导）
+  const config = await initConfig();
+
+  console.log(`\n🚀 iFlow Feishu v${VERSION}`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log(`📱 飞书 App ID: ${config.feishu.appId.substring(0, 15)}...`);
   console.log(`🌐 服务端口: ${config.server.port}`);
