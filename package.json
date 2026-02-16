@@ -21,7 +21,7 @@
     "feishu-bot",
     "lark-bot"
   ],
-  "author": "yfxiao <ai520510xyf@163.com>",
+  "author": "ai520510xyf-del <ai520510xyf@163.com>",
   "license": "MIT",
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.x"
@@ -43,10 +43,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yfxiao/iflow-feishu.git"
+    "url": "git+https://github.com/ai520510xyf-del/iflow-feishu.git"
   },
   "bugs": {
-    "url": "https://github.com/yfxiao/iflow-feishu/issues"
+    "url": "https://github.com/ai520510xyf-del/iflow-feishu/issues"
   },
-  "homepage": "https://github.com/yfxiao/iflow-feishu#readme"
+  "homepage": "https://github.com/ai520510xyf-del/iflow-feishu#readme"
 }
