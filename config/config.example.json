@@ -1,0 +1,26 @@
+{
+  "feishu": {
+    "appId": "cli_xxxxxxxxxxxxxxxx",
+    "appSecret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  "iflow": {
+    "command": "iflow",
+    "timeout": 120000,
+    "workDir": ""
+  },
+  "server": {
+    "port": 18080
+  },
+  "sessions": {
+    "dir": "",
+    "maxHistory": 15
+  },
+  "card": {
+    "titleFontSize": "small",
+    "colors": {
+      "model": "blue",
+      "generating": "orange",
+      "completed": "green"
+    }
+  }
+}
