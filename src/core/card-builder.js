@@ -2,6 +2,33 @@
  * 卡片构建器
  */
 
+/**
+ * 格式化时间显示
+ * @param {number} ms - 毫秒数
+ * @returns {string} 格式化的时间字符串
+ */
+function formatTime(ms) {
+  if (ms < 1000) {
+    return `${ms}ms`;
+  }
+  
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  
+  if (hours > 0) {
+    const remainMinutes = minutes % 60;
+    return remainMinutes > 0 ? `${hours}h ${remainMinutes}m` : `${hours}h`;
+  }
+  
+  if (minutes > 0) {
+    const remainSeconds = seconds % 60;
+    return remainSeconds > 0 ? `${minutes}m ${remainSeconds}s` : `${minutes}m`;
+  }
+  
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
 class CardBuilder {
   buildMarkdownCard(text) {
     // 预处理 Markdown 内容，确保列表格式正确
@@ -20,11 +47,10 @@ class CardBuilder {
     if (reasoning && reasoning.trim()) {
       let thinkingStatus = '';
       if (isThinking) {
-        const timeStr = thinkingTime !== null ? `(${(thinkingTime/1000).toFixed(1)}s)` : '';
+        const timeStr = thinkingTime !== null ? `(${formatTime(thinkingTime)})` : '';
         thinkingStatus = `💭 思考中 ${timeStr}`;
       } else if (thinkingTime !== null) {
-        const timeStr = thinkingTime > 1000 ? `${(thinkingTime/1000).toFixed(1)}s` : `${thinkingTime}ms`;
-        thinkingStatus = `💭 思考完成 (${timeStr})`;
+        thinkingStatus = `💭 思考完成 (${formatTime(thinkingTime)})`;
       }
       
       let titleContent = '';
@@ -51,11 +77,9 @@ class CardBuilder {
     if (content !== null || responseTime !== null || isGenerating) {
       let responseTitle = '📝 回复';
       if (isGenerating && responseTime !== null) {
-        const timeStr = responseTime > 1000 ? `${(responseTime/1000).toFixed(1)}s` : `${responseTime}ms`;
-        responseTitle = `📝 Doing (${timeStr})`;
+        responseTitle = `📝 Doing (${formatTime(responseTime)})`;
       } else if (!isGenerating && responseTime !== null) {
-        const timeStr = responseTime > 1000 ? `${(responseTime/1000).toFixed(1)}s` : `${responseTime}ms`;
-        responseTitle = `📝 Done (${timeStr})`;
+        responseTitle = `📝 Done (${formatTime(responseTime)})`;
       }
       
       let titleContent = '';
