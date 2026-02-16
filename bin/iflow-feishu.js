@@ -233,7 +233,7 @@ function startService() {
 async function main() {
   console.log('');
   console.log('╔══════════════════════════════════════╗');
-  console.log(`║    iFlow Feishu Bridge               ║`);
+  console.log(`║         iFlow Feishu                 ║`);
   console.log(`║           版本 ${VERSION.padEnd(20)}║`);
   console.log('╚══════════════════════════════════════╝');
   console.log('');
