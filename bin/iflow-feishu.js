@@ -89,11 +89,18 @@ async function checkIFlowCLI() {
   
   if (commandExists('iflow')) {
     const version = getCommandVersion('iflow');
-    log.success(`iFlow CLI 已安装 (版本: ${version})`);
-    return true;
+    // 验证 iFlow CLI 是否真正可用
+    try {
+      execSync('iflow --version', { stdio: 'pipe', timeout: 5000 });
+      log.success(`iFlow CLI 已安装 (版本: ${version})`);
+      return true;
+    } catch (err) {
+      log.warn('iFlow CLI 存在但无法正常运行');
+      console.log(`错误: ${err.message}`);
+    }
   }
   
-  log.warn('iFlow CLI 未安装');
+  log.warn('iFlow CLI 未安装或不可用');
   console.log('');
   console.log('iFlow CLI 是运行此插件必需的依赖。');
   console.log('官网: https://iflow.dev');
@@ -105,8 +112,14 @@ async function checkIFlowCLI() {
     log.info('正在安装 iFlow CLI...');
     try {
       execSync('npm install -g @iflow-ai/iflow-cli', { stdio: 'inherit' });
-      log.success('iFlow CLI 安装成功');
-      return true;
+      // 再次验证
+      if (commandExists('iflow')) {
+        log.success('iFlow CLI 安装成功');
+        return true;
+      } else {
+        log.error('安装后仍未找到 iflow 命令，请检查 PATH');
+        return false;
+      }
     } catch (err) {
       log.error(`安装失败: ${err.message}`);
       console.log('');
@@ -216,16 +229,15 @@ async function verifyFeishuCredentials(appId, appSecret) {
 async function checkFeishuConfig() {
   log.step('检查飞书配置...');
   
-  // 检查环境变量
+  // 优先检查环境变量
   if (process.env.FEISHU_APP_ID && process.env.FEISHU_APP_SECRET) {
-    // 验证环境变量
     const verify = await verifyFeishuCredentials(process.env.FEISHU_APP_ID, process.env.FEISHU_APP_SECRET);
     if (verify.valid) {
       log.success('环境变量配置有效');
       return true;
     } else {
-      log.error(`环境变量配置无效: ${verify.error}`);
-      return false;
+      log.warn(`环境变量配置无效: ${verify.error}`);
+      log.info('尝试使用配置文件...');
     }
   }
   
@@ -234,19 +246,20 @@ async function checkFeishuConfig() {
     try {
       const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
       if (config.appId && config.appSecret) {
-        // 验证已有配置
         const verify = await verifyFeishuCredentials(config.appId, config.appSecret);
         if (verify.valid) {
           log.success('飞书配置有效');
           return true;
         } else {
-          log.warn(`现有配置无效: ${verify.error}`);
-          log.info('请重新配置');
+          log.warn(`配置文件无效: ${verify.error}`);
+          log.info('需要重新配置');
         }
       }
     } catch (err) {
       log.warn(`配置文件格式错误: ${err.message}`);
     }
+  } else {
+    log.warn('未找到飞书配置文件');
   }
   
   // 交互式配置
@@ -254,15 +267,14 @@ async function checkFeishuConfig() {
   let attempts = 0;
   const maxAttempts = 3;
   
+  console.log('');
+  console.log('请输入飞书机器人凭证（从飞书开放平台获取）:');
+  console.log('文档: https://open.feishu.cn/document/home/introduction-to-feishu-open-platform');
+  
   while (!configured && attempts < maxAttempts) {
     if (attempts > 0) {
       console.log('');
       log.warn(`第 ${attempts + 1} 次尝试 (最多 ${maxAttempts} 次)`);
-    } else {
-      console.log('');
-      console.log('请输入飞书机器人凭证（从飞书开放平台获取）:');
-      console.log('文档: https://open.feishu.cn/document/home/introduction-to-feishu-open-platform');
-      console.log('');
     }
     
     const rl = readline.createInterface({
